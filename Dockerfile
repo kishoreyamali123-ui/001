@@ -30,8 +30,10 @@ RUN apk add --no-cache \
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir --upgrade pip \
+    && pip3 install --no-cache-dir setuptools \
     && pip3 install --no-cache-dir --upgrade -r sainibots.txt \
     && python3 -m pip install -U yt-dlp
 
 # Set the command to run the application
 CMD ["sh", "-c", "gunicorn app:app & python3 main.py"]
+
