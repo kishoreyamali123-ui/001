@@ -1,41 +1,42 @@
-# Use a Python 3.12.3 Alpine base image
-FROM python:3.12-alpine3.20
+# Use stable Python version (3.11 works better with gunicorn and pkg_resources)
+FROM python:3.11-slim
 
-# Set the working directory
+# Set working directory
 WORKDIR /app
 
-# Copy all files from the current directory to the container's /app directory
-COPY . .
-
-# Install necessary dependencies
-RUN apk add --no-cache \
-    gcc \
-    libffi-dev \
-    musl-dev \
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
     ffmpeg \
     aria2 \
-    make \
+    wget \
+    unzip \
+    gcc \
     g++ \
-    cmake && \
-    wget -q https://github.com/axiomatic-systems/Bento4/archive/v1.6.0-639.zip && \
-    unzip v1.6.0-639.zip && \
-    cd Bento4-1.6.0-639 && \
-    mkdir build && \
-    cd build && \
-    cmake .. && \
-    make -j$(nproc) && \
-    cp mp4decrypt /usr/local/bin/ &&\
-    cd ../.. && \
-    rm -rf Bento4-1.6.0-639 v1.6.0-639.zip
+    make \
+    cmake \
+    libffi-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel \
-    && pip3 install --no-cache-dir --upgrade -r sainibots.txt \
-    && pip3 install --no-cache-dir setuptools \
-    && python3 -m pip install -U yt-dlp
+# Install Bento4 (for mp4decrypt)
+RUN wget -q https://github.com/axiomatic-systems/Bento4/archive/v1.6.0-639.zip \
+    && unzip v1.6.0-639.zip \
+    && cd Bento4-1.6.0-639 \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && make -j$(nproc) \
+    && cp mp4decrypt /usr/local/bin/ \
+    && cd / \
+    && rm -rf Bento4-1.6.0-639 v1.6.0-639.zip
 
-# Set the command to run the application
-CMD ["sh", "-c", "gunicorn app:app & python3 main.py"]
+# Copy project files
+COPY . .
 
+# Install python dependencies
+RUN pip install --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir -r sainibots.txt \
+    && pip install --no-cache-dir yt-dlp gunicorn
 
-
+# Start both services
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:$PORT & python3 main.py"]
